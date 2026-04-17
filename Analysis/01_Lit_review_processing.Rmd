@@ -182,7 +182,8 @@ By ecosystem
 
 ```{r}
 #Focus on legacy and memory
-ecosystem <- all_classified %>%
+ecosystem <- discipline %>%
+  select(all_of(c(colnames(all_classified), "Discipline"))) %>%
   mutate(
     Lake = grepl("\\blake", full_text, ignore.case = T),
     Wetland = grepl("\\bwetland", full_text, ignore.case = T),
@@ -260,6 +261,18 @@ ecosystem %>%
   theme_bw()+
   theme(legend.position = "bottom",
         plot.margin = unit(c(5, 60, 5, 5), units = "pt"))
+```
+
+Export
+
+```{r}
+out <- ecosystem %>%
+  select(all_of(c(colnames(all_classified), "Discipline", "Ecosystem")))
+
+write_csv(out, "../Compiled_data/full_dataset_classified.csv")
+write_csv(out %>%
+            filter(grepl("Stream|River", Ecosystem)),
+          "../Compiled_data/streams_and_rivers.csv")
 ```
 
 Count the various words that come after memory
