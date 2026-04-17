@@ -117,6 +117,86 @@ all_classified %>%
   theme(axis.title.x = element_blank())
 ```
 
+By discipline
+
+```{r}
+#Focus on legacy and memory
+discipline <- all_classified %>%
+  mutate(
+    Ecology = grepl("\\becolog", full_text, ignore.case = T),
+    Ecosystem = grepl("\\becosystem", full_text, ignore.case = T),
+    Hydrology = grepl("\\bhydrolog", full_text, ignore.case = T)
+  ) %>%
+  rowwise() %>%
+  mutate(
+    Discipline = paste(
+      c('"Ecology"', '"Ecosystem"', '"Hydrology"')[c(Ecology, Ecosystem, Hydrology)],
+      collapse = " and "
+    ),
+    Discipline = ifelse(Discipline == "", NA, Discipline),
+    Discipline = ifelse(
+      Ecology & Ecosystem & Hydrology,
+      "All",
+      Discipline
+    )
+  ) %>%
+  ungroup()
+
+discipline %>%
+  select(PY, Legacy, Mem_not_lstm, Discipline) %>%
+  mutate(Both = ifelse(Legacy & Mem_not_lstm,
+                       T, F),
+         Legacy = ifelse(Both, F, Legacy),
+         Mem_not_lstm = ifelse(Both, F, Mem_not_lstm)) %>%
+  pivot_longer(-c(PY, Discipline)) %>%
+  group_by(PY, name, Discipline) %>%
+  summarize(sum = sum(value)) %>%
+  left_join(tots) %>%
+  filter(PY < 2026,
+         PY >= 1980) %>%
+  mutate(name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) %>%
+  ggplot(aes(x = PY, y = sum/Count*100, fill = name)) +
+  geom_area()+
+  scale_fill_manual(name = "Term",
+                     values = c("#FB8B24", "#36494E", "#3E92CC"),
+                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
+                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+  ylab("Percentage of all ecology/hydrology papers")+
+  theme_bw()+
+  theme(axis.title.x = element_blank())+
+  facet_wrap(~Discipline)
+
+discipline %>%
+  select(Legacy, Mem_not_lstm, Discipline) %>%
+  mutate(Both = ifelse(Legacy & Mem_not_lstm,
+                       T, F),
+         Legacy = ifelse(Both, F, Legacy),
+         Mem_not_lstm = ifelse(Both, F, Mem_not_lstm)) %>%
+  pivot_longer(-c(Discipline)) %>%
+  group_by(name, Discipline) %>%
+  summarize(sum = sum(value), .groups = "drop") %>%
+  group_by(Discipline) %>%
+  mutate(tot = sum(sum),
+         pct = sum/tot * 100,
+         n_lab = paste0(tot, ' papers'),
+         name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) %>%
+  ggplot(aes(y = Discipline, x = pct)) +
+  geom_col(aes(fill = name))+
+  coord_cartesian(xlim = c(0, 100), clip = "off", expand = F)+
+  geom_text(aes(x = 101, label = n_lab), hjust = 0,
+            data = . %>% select(tot, Discipline, n_lab) %>% distinct(),
+            size = 3)+
+  scale_fill_manual(name = "Term",
+                     values = c("#FB8B24", "#36494E", "#3E92CC"),
+                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
+                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+  ylab("Discipline mentioned")+
+  xlab("Percent of papers")+
+  theme_bw()+
+  theme(legend.position = "bottom",
+        plot.margin = unit(c(5, 60, 5, 5), units = "pt"))
+```
+
 Count the various words that come after memory
 
 ```{r}
@@ -180,27 +260,28 @@ Time units
 driver_df <- all_classified %>%
   mutate(
     Year = grepl("\\byear", full_text, ignore.case = T),
+    Season = grepl("\\bseason", full_text, ignore.case = T),
     Month = grepl("\\bmonth", full_text, ignore.case = T),
     Day = grepl("\\bday", full_text, ignore.case = T),
     Decade = grepl("\\bdecade", full_text, ignore.case = T),
-    Century = grepl("\\bcentur|centenial", full_text, ignore.case = T),
+    Century = grepl("\\bcentur|centennial", full_text, ignore.case = T),
     Hour = grepl("\\bhour", full_text, ignore.case = T),
     Minute = grepl("\\bminute", full_text, ignore.case = T)
   )
 
 driver_df %>%
-  select(Mem_not_lstm, Legacy, Lag, Century, Decade, Year, Month, Day, Hour, Minute) %>%
+  select(Mem_not_lstm, Legacy, Lag, Century, Decade, Year, Season, Month, Day, Hour, Minute) %>%
   pivot_longer(c(Mem_not_lstm, Legacy, Lag)) %>%
   filter(value) %>%
   group_by(name) %>%
-  summarize(across(c(Century, Decade, Year, Month, Day, Hour, Minute), sum),
+  summarize(across(c(Century, Decade, Year, Season, Month, Day, Hour, Minute), sum),
             tot = n()) %>%
-  pivot_longer(c(Century, Decade, Year, Month, Day, Hour, Minute), 
+  pivot_longer(c(Century, Decade, Year, Season, Month, Day, Hour, Minute), 
                names_to = "Time", values_to = "sum") %>%
   mutate(pct = sum/tot*100,
          Time = factor(Time,
-                       levels = c("Century","Decade", "Year", "Month", "Day", 
-                                  "Hour", "Minute"))) %>%
+                       levels = c("Century","Decade", "Year", "Season",
+                                  "Month", "Day", "Hour", "Minute"))) %>%
   ggplot(aes(x = Time, y = pct, fill = name))+
   scale_fill_manual(name = "Term",
                      values = c("#FB8B24", "#3E92CC", "grey40"),
