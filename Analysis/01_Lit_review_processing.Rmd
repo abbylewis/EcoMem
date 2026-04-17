@@ -86,7 +86,7 @@ all_classified %>%
   geom_smooth()+
   scale_color_manual(name = "Term",
                      values = c("purple2","blue3", "lightblue3", "turquoise4", "green4"))+
-  ylab("Percentage of all ecology papers")+
+  ylab("Percentage of all ecology/hydrology papers")+
   theme_bw()+
   theme(axis.title.x = element_blank(),
         legend.position = "none")+
@@ -112,7 +112,7 @@ all_classified %>%
                      values = c("#FB8B24", "#36494E", "#3E92CC"),
                     breaks = c("Legacy", "Both", "Mem_not_lstm"),
                     labels = c("Legacy", "Both", "Memory (not LSTM)"))+
-  ylab("Percentage of all ecology papers")+
+  ylab("Percentage of all ecology/hydrology papers")+
   theme_bw()+
   theme(axis.title.x = element_blank())
 ```
@@ -191,6 +191,90 @@ discipline %>%
                     breaks = c("Legacy", "Both", "Mem_not_lstm"),
                     labels = c("Legacy", "Both", "Memory (not LSTM)"))+
   ylab("Discipline mentioned")+
+  xlab("Percent of papers")+
+  theme_bw()+
+  theme(legend.position = "bottom",
+        plot.margin = unit(c(5, 60, 5, 5), units = "pt"))
+```
+
+By ecosystem
+
+```{r}
+#Focus on legacy and memory
+ecosystem <- all_classified %>%
+  mutate(
+    Lake = grepl("\\blake", full_text, ignore.case = T),
+    Wetland = grepl("\\bwetland", full_text, ignore.case = T),
+    Stream = grepl("\\bstream", full_text, ignore.case = T),
+    River = grepl("\\briver", full_text, ignore.case = T),
+    Grassland = grepl("\\bgrass|\\bprarie|\\bsavanna", full_text, ignore.case = T),
+    Forest = grepl("\\bforest", full_text, ignore.case = T),
+    Pond = grepl("\\bpond", full_text, ignore.case = T),
+    Marine = grepl("\\bmarine|\\bocean", full_text, ignore.case = T),
+    Soil = grepl("\\bsoil", full_text, ignore.case = T)
+  ) %>%
+  rowwise() %>%
+  mutate(
+    Ecosystem = paste(
+      c('"Lake"', '"Wetland"', '"Stream"', '"River"', '"Grassland"', 
+        '"Forest"', '"Pond"', '"Marine"', '"Soil"')[
+          c(Lake, Wetland, Stream, River, Grassland, Forest, Pond, Marine, Soil)],
+      collapse = " and "
+    ),
+    Ecosystem = ifelse(Ecosystem == "", NA, Ecosystem)) %>%
+  ungroup()
+
+ecosystem %>%
+  select(PY, Legacy, Mem_not_lstm, Ecosystem) %>%
+  mutate(Both = ifelse(Legacy & Mem_not_lstm,
+                       T, F),
+         Legacy = ifelse(Both, F, Legacy),
+         Mem_not_lstm = ifelse(Both, F, Mem_not_lstm)) %>%
+  pivot_longer(-c(PY, Ecosystem)) %>%
+  group_by(PY, name, Ecosystem) %>%
+  summarize(sum = sum(value)) %>%
+  left_join(tots) %>%
+  filter(PY < 2026,
+         PY >= 1980) %>%
+  mutate(name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) %>%
+  ggplot(aes(x = PY, y = sum/Count*100, fill = name)) +
+  geom_area()+
+  scale_fill_manual(name = "Term",
+                     values = c("#FB8B24", "#36494E", "#3E92CC"),
+                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
+                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+  ylab("Percentage of all ecology/hydrology papers")+
+  theme_bw()+
+  theme(axis.title.x = element_blank())+
+  facet_wrap(~Ecosystem)
+
+ecosystem %>%
+  select(Legacy, Mem_not_lstm, Ecosystem) %>%
+  mutate(Both = ifelse(Legacy & Mem_not_lstm,
+                       T, F),
+         Legacy = ifelse(Both, F, Legacy),
+         Mem_not_lstm = ifelse(Both, F, Mem_not_lstm)) %>%
+  pivot_longer(-c(Ecosystem)) %>%
+  group_by(name, Ecosystem) %>%
+  summarize(sum = sum(value), .groups = "drop") %>%
+  group_by(Ecosystem) %>%
+  mutate(tot = sum(sum),
+         pct = sum/tot * 100,
+         n_lab = paste0(tot, ' papers'),
+         name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) %>%
+  filter(tot > 200,
+         !is.na(Ecosystem)) %>%
+  ggplot(aes(y = Ecosystem, x = pct)) +
+  geom_col(aes(fill = name))+
+  coord_cartesian(xlim = c(0, 100), clip = "off", expand = F)+
+  geom_text(aes(x = 101, label = n_lab), hjust = 0,
+            data = . %>% select(tot, Ecosystem, n_lab) %>% distinct(),
+            size = 3)+
+  scale_fill_manual(name = "Term",
+                     values = c("#FB8B24", "#36494E", "#3E92CC"),
+                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
+                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+  ylab("Ecosystem mentioned")+
   xlab("Percent of papers")+
   theme_bw()+
   theme(legend.position = "bottom",
