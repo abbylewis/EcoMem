@@ -48,9 +48,10 @@ all_classified <- all %>%
                  full_text, ignore.case = TRUE),
     Mem_not_lstm = grepl("\\bmemor", 
                          gsub("long[- ]short[- ]term[- ]memory",
-                             "",
-                             full_text, ignore.case = T),
-                         ignore.case = T)
+                              "",
+                              gsub("socio[- ]*ecological[- ]memory",
+                                   "", full_text),
+                              ignore.case = TRUE))
   ) 
 
 #Plot each over time
