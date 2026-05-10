@@ -49,7 +49,7 @@ all_classified <- all %>%
     Mem_not_lstm = grepl("\\bmemor", 
                          gsub("long[- ]short[- ]term[- ]memory",
                               "",
-                              gsub("socio[- ]*ecological[- ]memory",
+                              gsub("(social|socio)[- ]?ecological[- ]memory",
                                    "", full_text),
                               ignore.case = TRUE))
   ) 
@@ -91,12 +91,14 @@ all_classified %>%
   ggplot(aes(x = PY, y = sum/Count*100, fill = name)) +
   geom_area()+
   scale_fill_manual(name = "Term",
-                     values = c("#FB8B24", "#36494E", "#3E92CC"),
-                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
-                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+                     values = c("#FB8B24", "#3E92CC", "#36494E"),
+                    breaks = c("Legacy", "Mem_not_lstm", "Both"),
+                    labels = c("Legacy", "Memory (not LSTM)", "Both"))+
   ylab("Percentage of all ecology/hydrology papers")+
-  theme_bw()+
-  theme(axis.title.x = element_blank())
+  xlab("Year")+
+  egg::theme_article()
+
+ggsave("../Figures/terms_over_time.png", width = 6, height = 4)
 ```
 
 By discipline
@@ -124,6 +126,7 @@ discipline <- all_classified %>%
   ) %>%
   ungroup()
 
+# Plot over time
 discipline %>%
   select(PY, Legacy, Mem_not_lstm, Discipline) %>%
   mutate(Both = ifelse(Legacy & Mem_not_lstm,
@@ -140,15 +143,16 @@ discipline %>%
   ggplot(aes(x = PY, y = sum/Count*100, fill = name)) +
   geom_area()+
   scale_fill_manual(name = "Term",
-                     values = c("#FB8B24", "#36494E", "#3E92CC"),
-                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
-                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+                     values = c("#FB8B24", "#3E92CC", "#36494E"),
+                    breaks = c("Legacy", "Mem_not_lstm", "Both"),
+                    labels = c("Legacy", "Memory (not LSTM)", "Both"))+
   ylab("Percentage of all ecology/hydrology papers")+
   theme_bw()+
   theme(axis.title.x = element_blank())+
   facet_wrap(~Discipline)
 
-discipline %>%
+# Summarize by discipline 
+discipline_sum <- discipline %>%
   select(Legacy, Mem_not_lstm, Discipline) %>%
   mutate(Both = ifelse(Legacy & Mem_not_lstm,
                        T, F),
@@ -161,7 +165,10 @@ discipline %>%
   mutate(tot = sum(sum),
          pct = sum/tot * 100,
          n_lab = paste0(tot, ' papers'),
-         name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) %>%
+         name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) 
+
+# Plot all
+discipline_sum %>%
   ggplot(aes(y = Discipline, x = pct)) +
   geom_col(aes(fill = name))+
   coord_cartesian(xlim = c(0, 100), clip = "off", expand = F)+
@@ -169,14 +176,36 @@ discipline %>%
             data = . %>% select(tot, Discipline, n_lab) %>% distinct(),
             size = 3)+
   scale_fill_manual(name = "Term",
-                     values = c("#FB8B24", "#36494E", "#3E92CC"),
-                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
-                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+                     values = c("#FB8B24", "#3E92CC", "#36494E"),
+                    breaks = c("Legacy", "Mem_not_lstm", "Both"),
+                    labels = c("Legacy", "Memory (not LSTM)", "Both"))+
   ylab("Discipline mentioned")+
   xlab("Percent of papers")+
-  theme_bw()+
+  egg::theme_article()+
   theme(legend.position = "bottom",
         plot.margin = unit(c(5, 60, 5, 5), units = "pt"))
+
+ggsave("../Figures/discipline.png", width = 6, height = 4)
+
+# Plot just the main 3
+discipline_sum %>%
+  ggplot(aes(y = Discipline, x = pct)) +
+  geom_col(aes(fill = name))+
+  coord_cartesian(xlim = c(0, 100), clip = "off", expand = F)+
+  geom_text(aes(x = 101, label = n_lab), hjust = 0,
+            data = . %>% select(tot, Discipline, n_lab) %>% distinct(),
+            size = 3)+
+  scale_fill_manual(name = "Term",
+                     values = c("#FB8B24", "#3E92CC", "#36494E"),
+                    breaks = c("Legacy", "Mem_not_lstm", "Both"),
+                    labels = c("Legacy", "Memory (not LSTM)", "Both"))+
+  ylab("Discipline mentioned")+
+  xlab("Percent of papers")+
+  egg::theme_article()+
+  theme(legend.position = "bottom",
+        plot.margin = unit(c(5, 60, 5, 5), units = "pt"))
+
+ggsave("../Figures/discipline_trimmed.png", width = 6, height = 2.5)
 ```
 
 By ecosystem
@@ -190,7 +219,7 @@ ecosystem <- discipline %>%
     Wetland = grepl("\\bwetland", full_text, ignore.case = T),
     Stream = grepl("\\bstream", full_text, ignore.case = T),
     River = grepl("\\briver", full_text, ignore.case = T),
-    Grassland = grepl("\\bgrass|\\bprarie|\\bsavanna", full_text, ignore.case = T),
+    #Grassland = grepl("\\bgrass|\\bprarie|\\bsavanna", full_text, ignore.case = T),
     Forest = grepl("\\bforest", full_text, ignore.case = T),
     Pond = grepl("\\bpond", full_text, ignore.case = T),
     Marine = grepl("\\bmarine|\\bocean", full_text, ignore.case = T),
@@ -199,39 +228,16 @@ ecosystem <- discipline %>%
   rowwise() %>%
   mutate(
     Ecosystem = paste(
-      c('"Lake"', '"Wetland"', '"Stream"', '"River"', '"Grassland"', 
+      c('"Lake"', '"Wetland"', '"Stream"', '"River"', #'"Grassland"', 
         '"Forest"', '"Pond"', '"Marine"', '"Soil"')[
-          c(Lake, Wetland, Stream, River, Grassland, Forest, Pond, Marine, Soil)],
+          c(Lake, Wetland, Stream, River, Forest, Pond, Marine, Soil)],
       collapse = " and "
     ),
     Ecosystem = ifelse(Ecosystem == "", NA, Ecosystem)) %>%
   ungroup()
 
-ecosystem %>%
-  select(PY, Legacy, Mem_not_lstm, Ecosystem) %>%
-  mutate(Both = ifelse(Legacy & Mem_not_lstm,
-                       T, F),
-         Legacy = ifelse(Both, F, Legacy),
-         Mem_not_lstm = ifelse(Both, F, Mem_not_lstm)) %>%
-  pivot_longer(-c(PY, Ecosystem)) %>%
-  group_by(PY, name, Ecosystem) %>%
-  summarize(sum = sum(value)) %>%
-  left_join(tots) %>%
-  filter(PY < 2026,
-         PY >= 1980) %>%
-  mutate(name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) %>%
-  ggplot(aes(x = PY, y = sum/Count*100, fill = name)) +
-  geom_area()+
-  scale_fill_manual(name = "Term",
-                     values = c("#FB8B24", "#36494E", "#3E92CC"),
-                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
-                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
-  ylab("Percentage of all ecology/hydrology papers")+
-  theme_bw()+
-  theme(axis.title.x = element_blank())+
-  facet_wrap(~Ecosystem)
-
-ecosystem %>%
+# Summarize by ecosystem type
+ecosystem_sum <- ecosystem %>%
   select(Legacy, Mem_not_lstm, Ecosystem) %>%
   mutate(Both = ifelse(Legacy & Mem_not_lstm,
                        T, F),
@@ -247,6 +253,19 @@ ecosystem %>%
          name = factor(name, levels = c("Legacy", "Both", "Mem_not_lstm"))) %>%
   filter(tot > 200,
          !is.na(Ecosystem)) %>%
+  mutate(Ecosystem = factor(Ecosystem,
+                            levels = rev(c('"Soil"',
+                                       '"Grassland" and "Soil"',
+                                       '"Forest" and "Soil"',
+                                       '"Forest"',
+                                       '"Marine"',
+                                       '"Lake"',
+                                       '"River"',
+                                       '"Stream"'
+                                       )))) 
+
+# Plot percents
+ecosystem_sum %>%
   ggplot(aes(y = Ecosystem, x = pct)) +
   geom_col(aes(fill = name))+
   coord_cartesian(xlim = c(0, 100), clip = "off", expand = F)+
@@ -254,14 +273,32 @@ ecosystem %>%
             data = . %>% select(tot, Ecosystem, n_lab) %>% distinct(),
             size = 3)+
   scale_fill_manual(name = "Term",
-                     values = c("#FB8B24", "#36494E", "#3E92CC"),
-                    breaks = c("Legacy", "Both", "Mem_not_lstm"),
-                    labels = c("Legacy", "Both", "Memory (not LSTM)"))+
+                     values = c("#FB8B24", "#3E92CC", "#36494E"),
+                    breaks = c("Legacy", "Mem_not_lstm", "Both"),
+                    labels = c("Legacy", "Memory (not LSTM)", "Both"))+
   ylab("Ecosystem mentioned")+
   xlab("Percent of papers")+
-  theme_bw()+
+  egg::theme_article()+
   theme(legend.position = "bottom",
         plot.margin = unit(c(5, 60, 5, 5), units = "pt"))
+
+ggsave("../Figures/ecosystem_percent.png", width = 6, height = 4)
+
+# Plot total counts
+ecosystem_sum %>%
+  ggplot(aes(y = Ecosystem, x = sum)) +
+  geom_col(aes(fill = name))+
+  scale_fill_manual(name = "Term",
+                     values = c("#FB8B24", "#3E92CC", "#36494E"),
+                    breaks = c("Legacy", "Mem_not_lstm", "Both"),
+                    labels = c("Legacy", "Memory (not LSTM)", "Both"))+
+  ylab("Ecosystem mentioned")+
+  xlab("Number of papers")+
+  egg::theme_article()+
+  theme(legend.position = "bottom",
+        plot.margin = unit(c(5, 60, 5, 5), units = "pt"))
+
+ggsave("../Figures/ecosystem_counts.png", width = 6, height = 4)
 ```
 
 Export
